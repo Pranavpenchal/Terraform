@@ -1,0 +1,105 @@
+provider "azurerm" {
+  features {}
+
+  subscription_id = "24aa38f7-032f-4aea-bad3-f5adab7581e6"
+  client_id       = "5823e794-0d6a-41ca-a5a4-2a7e63e891a1"
+  client_secret   = "nyq8Q~hINdNOhbDQbJh5XThQR5UbScfSxBBsEabC"
+  tenant_id       = "244fa5fa-1136-45b7-955d-8ff758ce433f"
+}
+
+resource "azurerm_resource_group" "TFRG" {
+  name     = "TF-RG"
+  location = "UK South"
+}
+
+resource "azurerm_virtual_network" "TFVnet" {
+  name                = "TF-Vnet1"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.TFRG.location
+  resource_group_name = azurerm_resource_group.TFRG.name
+}
+
+resource "azurerm_subnet" "TFS1" {
+  name                 = "TF-S1"
+  resource_group_name  = azurerm_resource_group.TFRG.name
+  virtual_network_name = azurerm_virtual_network.TFVnet.name
+  address_prefixes     = ["10.0.0.0/24"]
+}
+  resource "azurerm_subnet" "TFS2" {
+  name                 = "TF-S2"
+  resource_group_name  = azurerm_resource_group.TFRG.name
+  virtual_network_name = azurerm_virtual_network.TFVnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+  }
+
+resource "azurerm_network_interface" "NIC" {
+  name                = "TFNIC"
+  location            = azurerm_resource_group.TFRG.location
+  resource_group_name = azurerm_resource_group.TFRG.name
+
+  ip_configuration {
+    name                          = "testconfiguration"
+    subnet_id                     = azurerm_subnet.TFS1.id
+    private_ip_address_allocation = "Dynamic"
+  }
+} 
+
+resource "azurerm_network_security_group" "TFNSG" {
+  name                = "TFNSG1"
+  location            = azurerm_resource_group.TFRG.location
+  resource_group_name = azurerm_resource_group.TFRG.name
+
+  security_rule {
+    name                       = "SR1"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  tags = {
+    environment = "UAT"
+  }
+}
+
+resource "azurerm_virtual_machine" "TFVM" {
+  name                  = "VM1"
+  location              = azurerm_resource_group.TFRG.location
+  resource_group_name   = azurerm_resource_group.TFRG.name
+  network_interface_ids = [azurerm_network_interface.NIC.id]
+  vm_size               = "Standard_DS1_v2"
+
+   # Uncomment this line to delete the OS disk automatically when deleting the VM
+  # delete_os_disk_on_termination = true
+
+  # Uncomment this line to delete the data disks automatically when deleting the VM
+  # delete_data_disks_on_termination = true
+
+  storage_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "16.04-LTS"
+    version   = "latest"
+  }
+  storage_os_disk {
+    name              = "myosdisk1"
+    caching           = "ReadWrite"
+    create_option     = "FromImage"
+    managed_disk_type = "Standard_LRS"
+  }
+  os_profile {
+    computer_name  = "Divyavm"
+    admin_username = "Divya"
+    admin_password = "Password12345"
+  }
+  os_profile_linux_config {
+    disable_password_authentication = false
+  }
+  tags = {
+    environment = "UAT"
+  }
+}
